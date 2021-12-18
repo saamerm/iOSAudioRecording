@@ -34,6 +34,8 @@ namespace audioRecorder
             Console.WriteLine("Broadcast");
             Console.WriteLine(e.Data);
             Console.WriteLine(BitConverter.ToString(e.Data));
+            var stream = DependencyService.Get<IAudioStream>();
+            stream.PlayByteArrayAsync(e.Data);
         }
 
         private void Stream_OnActiveChanged(object sender, Xamarin.Forms.Internals.EventArg<bool> e)

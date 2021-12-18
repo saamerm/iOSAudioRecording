@@ -9,7 +9,6 @@ namespace audioRecorder
         /// Occurs when new audio has been streamed.
         /// </summary>
         event EventHandler<EventArg<byte[]>> OnBroadcast;
-
         /// <summary>
         /// Gets the sample rate.
         /// </summary>
@@ -30,12 +29,6 @@ namespace audioRecorder
         /// Gets bits per sample.
         /// </summary>
         int BitsPerSample { get; }
-
-        /// <summary>
-        /// Gets the average data transfer rate
-        /// </summary>
-        /// <value>The average data transfer rate in bytes per second.</value>
-        int AverageBytesPerSecond { get; }
     }
 }
 

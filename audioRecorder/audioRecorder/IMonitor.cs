@@ -30,5 +30,7 @@ namespace audioRecorder
         /// Stop monitoring.
         /// </summary>
         void Stop();
+
+        void PlayByteArrayAsync(byte[] byteArray);
     }
 }

@@ -1,6 +1,11 @@
 ﻿using System;
+using System.IO;
+using System.Text;
+using System.Threading.Tasks;
 using audioRecorder.iOS;
 using AudioToolbox;
+using AVFoundation;
+using Foundation;
 using Xamarin.Forms;
 using Xamarin.Forms.Internals;
 [assembly: Dependency(typeof(AudioStream))]
@@ -15,14 +20,6 @@ namespace audioRecorder.iOS
         #region IAudioStream implementation
 
         public event EventHandler<EventArg<byte[]>> OnBroadcast;
-
-        public int AverageBytesPerSecond
-        {
-            get
-            {
-                throw new NotImplementedException();
-            }
-        }
 
         public int SampleRate
         {
@@ -56,12 +53,44 @@ namespace audioRecorder.iOS
 
         public bool Start()
         {
-            return (this.audioQueue.Start() == AudioQueueStatus.Ok);
+            var x = (this.audioQueue.Start() == AudioQueueStatus.Ok);
+            return x;
         }
 
         public void Stop()
         {
             this.audioQueue.Stop(true);
+        }
+
+        public void PlayByteArrayAsync(byte[] pcmData)
+        {
+            int numSamples = pcmData.Length / (BitsPerSample / 8);
+
+            MemoryStream memoryStream = new MemoryStream();
+            BinaryWriter writer = new BinaryWriter(memoryStream, Encoding.ASCII);
+
+            // Construct WAVE header.
+            writer.Write(new char[] { 'R', 'I', 'F', 'F' });
+            writer.Write(36 + sizeof(short) * numSamples);
+            writer.Write(new char[] { 'W', 'A', 'V', 'E' });
+            writer.Write(new char[] { 'f', 'm', 't', ' ' });                // format chunk
+            writer.Write(16);                                               // PCM chunk size
+            writer.Write((short)1);                                         // PCM format flag
+            writer.Write((short)ChannelCount);
+            writer.Write(SampleRate);
+            writer.Write(SampleRate * ChannelCount * BitsPerSample / 8);   // byte rate
+            writer.Write((short)(ChannelCount * BitsPerSample / 8));         // block align
+            writer.Write((short)BitsPerSample);
+            writer.Write(new char[] { 'd', 'a', 't', 'a' });                // data chunk
+            writer.Write(numSamples * ChannelCount * BitsPerSample / 8);
+
+            // Write data as well.
+            writer.Write(pcmData, 0, pcmData.Length);
+
+            memoryStream.Seek(0, SeekOrigin.Begin);
+            NSData data = NSData.FromStream(memoryStream);
+            AVAudioPlayer audioPlayer = AVAudioPlayer.FromData(data);
+            audioPlayer.Play();
         }
 
         public bool Active
