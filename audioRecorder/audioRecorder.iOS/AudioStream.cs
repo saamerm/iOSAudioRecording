@@ -15,7 +15,7 @@ namespace audioRecorder.iOS
     {
         private InputAudioQueue audioQueue;
 
-        private readonly int bufferSize;
+        private readonly int _bufferSize;
 
         #region IAudioStream implementation
 
@@ -53,13 +53,15 @@ namespace audioRecorder.iOS
 
         public bool Start()
         {
-            var x = (this.audioQueue.Start() == AudioQueueStatus.Ok);
-            return x;
+            // Placed init here instead of the constructor because
+            // i wasn't able to start again after stopping
+            Init();
+            return (audioQueue.Start() == AudioQueueStatus.Ok);
         }
 
         public void Stop()
         {
-            this.audioQueue.Stop(true);
+            audioQueue.Stop(true);
         }
 
         public void PlayByteArrayAsync(byte[] pcmData)
@@ -97,7 +99,7 @@ namespace audioRecorder.iOS
         {
             get
             {
-                return this.audioQueue.IsRunning;
+                return audioQueue.IsRunning;
             }
         }
 
@@ -105,36 +107,37 @@ namespace audioRecorder.iOS
 
         public AudioStream()
         {
-            this.SampleRate = 8000;
-            this.bufferSize = 2048;
-            this.Init();
-
+            SampleRate = 8000;
+            _bufferSize = 2048;
         }
 
         private void Init()
         {
             var audioFormat = new AudioStreamBasicDescription()
             {
-                SampleRate = this.SampleRate,
+                SampleRate = SampleRate,
                 Format = AudioFormatType.LinearPCM,
                 FormatFlags = AudioFormatFlags.LinearPCMIsSignedInteger | AudioFormatFlags.LinearPCMIsPacked,
                 FramesPerPacket = 1,
                 ChannelsPerFrame = 1,
-                BitsPerChannel = this.BitsPerSample,
+                BitsPerChannel = BitsPerSample,
                 BytesPerPacket = 2,
                 BytesPerFrame = 2,
                 Reserved = 0
             };
 
             audioQueue = new InputAudioQueue(audioFormat);
+            // Unassigns the event handler if assigned, or else does nothing
+            // May not work to just put it in Stop() if the user taps Start() twice
+            audioQueue.InputCompleted -= QueueInputCompleted;
             audioQueue.InputCompleted += QueueInputCompleted;
 
-            var bufferByteSize = this.bufferSize * audioFormat.BytesPerPacket;
+            var bufferByteSize = _bufferSize * audioFormat.BytesPerPacket;
 
             IntPtr bufferPtr;
             for (var index = 0; index < 3; index++)
             {
-                audioQueue.AllocateBufferWithPacketDescriptors(bufferByteSize, this.bufferSize, out bufferPtr);
+                audioQueue.AllocateBufferWithPacketDescriptors(bufferByteSize, _bufferSize, out bufferPtr);
                 audioQueue.EnqueueBuffer(bufferPtr, bufferByteSize, null);
             }
         }
@@ -147,21 +150,21 @@ namespace audioRecorder.iOS
         private void QueueInputCompleted(object sender, InputCompletedEventArgs e)
         {
             // return if we aren't actively monitoring audio packets
-            if (!this.Active)
+            if (!Active)
             {
                 return;
             }
 
             var buffer = (AudioQueueBuffer)System.Runtime.InteropServices.Marshal.PtrToStructure(e.IntPtrBuffer, typeof(AudioQueueBuffer));
-            if (this.OnBroadcast != null)
+            if (OnBroadcast != null)
             {
                 var send = new byte[buffer.AudioDataByteSize];
                 System.Runtime.InteropServices.Marshal.Copy(buffer.AudioData, send, 0, (int)buffer.AudioDataByteSize);
 
-                this.OnBroadcast(this, new EventArg<byte[]>(send));
+                OnBroadcast(this, new EventArg<byte[]>(send));
             }
 
-            var status = audioQueue.EnqueueBuffer(e.IntPtrBuffer, this.bufferSize, e.PacketDescriptions);
+            var status = audioQueue.EnqueueBuffer(e.IntPtrBuffer, _bufferSize, e.PacketDescriptions);
 
             if (status != AudioQueueStatus.Ok)
             {
